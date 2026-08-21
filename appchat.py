@@ -76,7 +76,6 @@ if user_query:
         response_text = "Por favor, primero sube un archivo PDF en la barra lateral para poder extraer el contexto."
     else:
         with st.spinner("Buscando en la base de datos y redactando respuesta..."):
-            with st.spinner("Buscando en la base de datos y redactando respuesta..."):
             try:
                 # 1. Recuperación inteligente de fragmentos
                 # Traemos los 4 más relevantes, pero si se pregunta por el título o inicio, incluimos los primeros chunks del PDF
