@@ -59,13 +59,5 @@ if user_query:
             
     with st.chat_message("assistant"): st.write(response_text)
     st.session_state.chat_history.append({"role": "assistant", "content": response_text})
-#celda 3: Lanzar la aplicación a internet localmentePara poder ver y abrir la aplicación desde tu computadora o el celular mientras Colab esté encendido, necesitas crear un túnel público gratis usando Localtunnel. Pega esto en la tercera celda y ejecútalo:python# Corre streamlit en el fondo de Colab
-!streamlit run app.py &>/dev/null &
 
-# Obtén la dirección IP pública necesaria para desbloquear el túnel
-import urllib
-print("Tu contraseña de acceso es:", urllib.request.urlopen('https://icanhazip.com').read().decode('utf8').strip())
 
-# Abre el enlace público para abrir tu app de Streamlit
-!npx localtunnel --port 8501
-#Cuando ejecutes la Celda 3, te dará una dirección IP (Contraseña) y un enlace azul. Al hacer clic en el enlace, te pedirá la contraseña; la pegas y podrás interactuar con tu aplicación en tiempo real.
