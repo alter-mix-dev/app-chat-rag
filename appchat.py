@@ -25,7 +25,7 @@ if GROQ_API_KEY == "api-jgc":
     st.warning("⚠️ Usando clave de ejemplo. Si estás en la nube, asegúrate de configurar GROQ_API_KEY en Advanced Settings -> Secrets.")
 
 # Inicializar modelos con la clave correcta asignada
-llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2, groq_api_key=GROQ_API_KEY)
+llm = ChatGroq(model="gpt-oss-20b", temperature=0.2, groq_api_key=GROQ_API_KEY)
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 if "vector_store" not in st.session_state: st.session_state.vector_store = None
