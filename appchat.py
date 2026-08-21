@@ -71,6 +71,26 @@ with st.sidebar:
             finally: 
                 if os.path.exists(temp_file_path): 
                     os.remove(temp_file_path)
+    
+    # --- IMPLEMENTACIÓN DEL BOTÓN DE DESCARGA ---
+    if st.session_state.chat_history:
+        st.markdown("---")
+        st.subheader("💾 Acciones")
+        
+        # Estructuramos el contenido de texto plano iterando sobre el historial
+        contenido_historial = "--- HISTORIAL DE CONVERSACIÓN CON EL ASISTENTE RAG ---\n\n"
+        for msg in st.session_state.chat_history:
+            rol_etiqueta = "Usuario" if msg["role"] == "user" else "Asistente Virtual"
+            contenido_historial += f"[{rol_etiqueta}]:\n{msg['content']}\n\n"
+            contenido_historial += "-" * 40 + "\n\n"
+        
+        # Botón nativo de descarga en barra lateral
+        st.file_uploader = st.download_button(
+            label="📥 Descargar Historial (.txt)",
+            data=contenido_historial,
+            file_name="historial_chat_rag.txt",
+            mime="text/plain"
+        )
 
 # Mostrar el historial
 for message in st.session_state.chat_history:
@@ -91,14 +111,11 @@ if user_query:
                 # DETECCIÓN DE SOLICITUD DE CONTEO
                 conteo_info = ""
                 if any(p in user_query.lower() for p in ["cuantas veces", "cuántas veces", "repite"]):
-                    # Extraer términos candidatos entre comillas o palabras clave
                     match = re.search(r'["“]([^"”]+)["”]', user_query)
                     termino_a_buscar = match.group(1) if match else user_query.replace("cuantas veces", "").replace("cuántas veces", "").replace("se repite", "").replace("en espanol o ingles", "").replace("en español o inglés", "").strip("?¿ ")
                     
                     if termino_a_buscar:
                         texto_target = normalizar_texto(st.session_state.texto_completo_pdf)
-                        
-                        # Mapeo inteligente para variaciones comunes (español e inglés)
                         terminos_variaciones = [termino_a_buscar]
                         if "alfa sinucleina" in normalizar_texto(termino_a_buscar) or "alpha synuclein" in normalizar_texto(termino_a_buscar):
                             terminos_variaciones = ["alfa-sinucleina", "alfa sinucleina", "alpha-synuclein", "alpha synuclein", "a-synuclein", "a-sinucleina"]
@@ -139,4 +156,5 @@ if user_query:
     with st.chat_message("assistant"): 
         st.write(response_text)
     st.session_state.chat_history.append({"role": "assistant", "content": response_text})
+    st.rerun()  # Forzar actualización para activar dinámicamente el botón en la barra lateral
 
