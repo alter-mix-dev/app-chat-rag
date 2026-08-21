@@ -140,4 +140,3 @@ if user_query:
         st.write(response_text)
     st.session_state.chat_history.append({"role": "assistant", "content": response_text})
 
-
