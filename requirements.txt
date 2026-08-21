@@ -4,3 +4,4 @@ langchain-groq
 langchain-huggingface
 faiss-cpu
 pypdf
+langchain-community
