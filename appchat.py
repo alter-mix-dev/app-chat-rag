@@ -68,35 +68,37 @@ for message in st.session_state.chat_history:
 
 user_query = st.chat_input("Hazme una pregunta sobre tus documentos...")
 if user_query:
-    with st.spinner("Buscando en la base de datos y redactando respuesta..."):
+    with st.chat_message("user"): 
+        st.write(user_query)
+    st.session_state.chat_history.append({"role": "user", "content": user_query})
+    
+    if st.session_state.vector_store is None:
+        response_text = "Por favor, primero sube un archivo PDF en la barra lateral para poder extraer el contexto."
+    else:
+        with st.spinner("Buscando en la base de datos y redactando respuesta..."):
             try:
-                # 1. Recuperación inteligente de fragmentos
-                # Traemos los 4 más relevantes, pero si se pregunta por el título o inicio, incluimos los primeros chunks del PDF
                 retriever = st.session_state.vector_store.as_retriever(search_kwargs={"k": 4})
-                docs_retrieved = retriever.invoke(user_query)
                 
-                # Respaldo: Si la pregunta es global o sobre el título, inyectamos los fragmentos iniciales de la primera página
-                queries_globales = ["titulo", "title", "de que trata", "resumen", "articulo", "quien escribe"]
-                if any(q in user_query.lower() for q in queries_globales):
-                    # Obtenemos algunos fragmentos del principio asegurando que la portada esté presente
-                    todos_los_docs = st.session_state.vector_store.similarity_search("", k=3)
-                    docs_retrieved = list(set(docs_retrieved + todos_los_docs))
-
-                contexto_final = "\n\n".join(d.page_content for d in docs_retrieved)
-                
-                # 2. PROMPT OPTIMIZADO CON PERSONALIDAD EMPÁTICA
                 prompt = ChatPromptTemplate.from_template(
-                    "Eres un asistente virtual empático, experto y altamente resolutivo. Tu objetivo es ayudar al usuario de forma clara y directa.\n"
-                    "Analiza con atención el contexto provisto del documento PDF. Si te preguntan por el título, autor o resumen general, deduce la respuesta analizando la información de las primeras páginas que viene en el contexto.\n"
-                    "Evita dar respuestas robóticas o negativas a menos que sea estrictamente imposible deducirlo.\n\n"
-                    "Contexto del PDF:\n{context}\n\n"
-                    "Pregunta del usuario:\n{question}\n\n"
-                    "Respuesta analítica en español:"
+                    "Eres un asistente virtual experto y preciso. Responde estrictamente basado en el contexto provisto.\n"
+                    "Si la respuesta no viene explícita en el contexto, di amablemente que no cuentas con esa información.\n\n"
+                    "Contexto:\n{context}\n\n"
+                    "Pregunta:\n{question}\n\n"
+                    "Respuesta en español:"
                 )
                 
-                # Cadena interactiva ejecutada directamente con el contexto adaptativo
-                rag_chain = prompt | llm | StrOutputParser()
-                response_text = rag_chain.invoke({"context": contexto_final, "question": user_query})
-                
+                # Cadena interactiva RAG empleando LCEL (LangChain Expression Language)
+                rag_chain = (
+                    {"context": retriever | (lambda docs: "\n\n".join(d.page_content for d in docs)), "question": RunnablePassthrough()} 
+                    | prompt 
+                    | llm 
+                    | StrOutputParser()
+                )
+                response_text = rag_chain.invoke(user_query)
             except Exception as e:
                 response_text = f"Ocurrió un error al procesar la consulta con el modelo de lenguaje: {e}"
+            
+    with st.chat_message("assistant"): 
+        st.write(response_text)
+    st.session_state.chat_history.append({"role": "assistant", "content": response_text})
+
