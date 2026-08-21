@@ -10,26 +10,25 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
 # --- CONFIGURACIÓN DE SEGURIDAD REPARADA PARA LA NUBE ---
-# Validamos si estamos en local/Colab o en Streamlit Cloud
 if "GROQ_API_KEY" in st.secrets:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 else:
-    # Clave temporal por si lo corres en Colab (reemplaza por tu 'gsk_...' real si pruebas en Colab)
     GROQ_API_KEY = "api-jgc" 
 
 st.set_page_config(page_title="Asistente RAG", layout="wide")
 st.title("🦙 Asistente Virtual de JGC")
 
-# Validar que la API Key no sea la de ejemplo antes de llamar al modelo
 if GROQ_API_KEY == "api-jgc":
     st.warning("⚠️ Usando clave de ejemplo. Si estás en la nube, asegúrate de configurar GROQ_API_KEY en Advanced Settings -> Secrets.")
 
-# --- CAMBIO IMPORTANTE: Usamos un modelo oficial, activo y gratuito de Groq ---
+# Inicializar modelos activos en Groq
 llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0.2, groq_api_key=GROQ_API_KEY)
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
+# Inicializar estados de sesión
 if "vector_store" not in st.session_state: st.session_state.vector_store = None
 if "chat_history" not in st.session_state: st.session_state.chat_history = []
+if "inicio_documento" not in st.session_state: st.session_state.inicio_documento = ""
 
 with st.sidebar:
     st.header("📁 Base de Conocimiento")
@@ -37,31 +36,32 @@ with st.sidebar:
     if uploaded_file is not None:
         temp_file_path = f"temp_{uploaded_file.name}"
         
-        # Escribir el archivo y asegurar el cierre del flujo de datos
         with open(temp_file_path, "wb") as f: 
             f.write(uploaded_file.getbuffer())
         
         with st.spinner("Procesando y segmentando documento..."):
             try:
-                # Carga del PDF de forma segura
                 loader = PyPDFLoader(temp_file_path)
                 docs = loader.load()
                 
-                # Segmentación del texto en fragmentos
+                # REPARACIÓN GLOBAL: Guardamos el texto de las primeras páginas para el título
+                texto_inicial = ""
+                for i in range(min(2, len(docs))):
+                    texto_inicial += docs[i].page_content + "\n"
+                st.session_state.inicio_documento = texto_inicial
+                
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
                 splits = text_splitter.split_documents(docs)
                 
-                # Construcción del índice vectorial indexado en memoria
                 st.session_state.vector_store = FAISS.from_documents(splits, embeddings)
                 st.success("¡Documento procesado con éxito!")
             except Exception as e: 
                 st.error(f"Error al procesar el PDF: {e}")
             finally: 
-                # Eliminación del residuo temporal en el servidor de la nube
                 if os.path.exists(temp_file_path): 
                     os.remove(temp_file_path)
 
-# Mostrar el historial del chat de forma limpia
+# Mostrar el historial
 for message in st.session_state.chat_history:
     with st.chat_message(message["role"]): 
         st.write(message["content"])
@@ -77,24 +77,25 @@ if user_query:
     else:
         with st.spinner("Buscando en la base de datos y redactando respuesta..."):
             try:
+                # Buscamos los fragmentos más parecidos
                 retriever = st.session_state.vector_store.as_retriever(search_kwargs={"k": 4})
+                docs = retriever.invoke(user_query)
+                contexto_busqueda = "\n\n".join(d.page_content for d in docs)
+                
+                # REPARACIÓN DE CONTEXTO: Sumamos siempre la portada al contexto analizado
+                contexto_completo = f"--- INICIO/PORTADA DEL DOCUMENTO ---\n{st.session_state.inicio_documento}\n\n--- FRAGMENTOS RELEVANTES ---\n{contexto_busqueda}"
                 
                 prompt = ChatPromptTemplate.from_template(
-                    "Eres un asistente virtual experto y preciso. Responde estrictamente basado en el contexto provisto.\n"
-                    "Si la respuesta no viene explícita en el contexto, di amablemente que no cuentas con esa información.\n\n"
-                    "Contexto:\n{context}\n\n"
-                    "Pregunta:\n{question}\n\n"
-                    "Respuesta en español:"
+                    "Eres un asistente virtual experto, empático y preciso. Responde de forma fluida y natural en español.\n"
+                    "Utiliza la sección 'INICIO/PORTADA DEL DOCUMENTO' si el usuario te pregunta por el título, autores, revista o de qué trata el archivo en general.\n"
+                    "Si la información no puede deducirse de ninguna parte del contexto, indícalo amablemente.\n\n"
+                    "Contexto disponible:\n{context}\n\n"
+                    "Pregunta del usuario:\n{question}\n\n"
+                    "Respuesta analítica en español:"
                 )
                 
-                # Cadena interactiva RAG empleando LCEL (LangChain Expression Language)
-                rag_chain = (
-                    {"context": retriever | (lambda docs: "\n\n".join(d.page_content for d in docs)), "question": RunnablePassthrough()} 
-                    | prompt 
-                    | llm 
-                    | StrOutputParser()
-                )
-                response_text = rag_chain.invoke(user_query)
+                rag_chain = prompt | llm | StrOutputParser()
+                response_text = rag_chain.invoke({"context": contexto_completo, "question": user_query})
             except Exception as e:
                 response_text = f"Ocurrió un error al procesar la consulta con el modelo de lenguaje: {e}"
             
