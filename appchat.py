@@ -68,14 +68,7 @@ for message in st.session_state.chat_history:
 
 user_query = st.chat_input("Hazme una pregunta sobre tus documentos...")
 if user_query:
-    with st.chat_message("user"): 
-        st.write(user_query)
-    st.session_state.chat_history.append({"role": "user", "content": user_query})
-    
-    if st.session_state.vector_store is None:
-        response_text = "Por favor, primero sube un archivo PDF en la barra lateral para poder extraer el contexto."
-    else:
-        with st.spinner("Buscando en la base de datos y redactando respuesta..."):
+    with st.spinner("Buscando en la base de datos y redactando respuesta..."):
             try:
                 # 1. Recuperación inteligente de fragmentos
                 # Traemos los 4 más relevantes, pero si se pregunta por el título o inicio, incluimos los primeros chunks del PDF
